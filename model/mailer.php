@@ -5,7 +5,8 @@
  * Utilisé pour : approbation, notifications, etc.
  */
 
-require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/../controller/config.php';
+
 
 /**
  * Envoie un email à l'utilisateur ou admin
