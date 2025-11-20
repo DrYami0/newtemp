@@ -1,0 +1,11 @@
+{
+    "username": "456",
+    "firstName": "",
+    "lastName": "",
+    "email": "456@456.com",
+    "phone": "",
+    "passwordHash": "$2y$10$Dr\/Fxy8AMTQpVrBsTthmSu1W6qfUzK9V2jNECpXw2xiMlSw7s7sHS",
+    "role": 0,
+    "accepted": null,
+    "created_at": "2025-11-20 11:43:07"
+}

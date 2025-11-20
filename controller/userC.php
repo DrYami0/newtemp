@@ -2,161 +2,144 @@
 require_once __DIR__ . '/../model/user.php';
 require_once __DIR__ . '/config.php';
 
-class UserRepository {
-    private $pdo;
+class UserC {
+
+    private string $pendingDir;
+    private string $approvedDir;
 
     public function __construct() {
-        $this->pdo = obtenirPDO();
+        $this->pendingDir  = __DIR__ . '/pending/';
+        $this->approvedDir = __DIR__ . '/approved/';
+
+        if (!is_dir($this->pendingDir))  mkdir($this->pendingDir, 0777, true);
+        if (!is_dir($this->approvedDir)) mkdir($this->approvedDir, 0777, true);
     }
 
-    // === Finders ===
-    public function findById(int $uid): ?User {
-        $stmt = $this->pdo->prepare("SELECT * FROM users WHERE uid = ? LIMIT 1");
-        $stmt->execute([$uid]);
-        $row = $stmt->fetch();
-        return $row ? $this->mapRowToUser($row) : null;
+    /* ============================================================
+       =============== FINDERS / SELECT ============================
+       ============================================================ */
+
+    // Find user by username (look in approved first)
+    public function findByUsername(string $username): ?array {
+        $pendingFile  = $this->pendingDir  . $username . '.json';
+        $approvedFile = $this->approvedDir . $username . '.json';
+
+        if (file_exists($approvedFile)) {
+            return json_decode(file_get_contents($approvedFile), true);
+        }
+
+        if (file_exists($pendingFile)) {
+            return json_decode(file_get_contents($pendingFile), true);
+        }
+
+        return null;
     }
 
-    public function findByEmail(string $email): ?User {
-        $stmt = $this->pdo->prepare("SELECT * FROM users WHERE email = ? LIMIT 1");
-        $stmt->execute([$email]);
-        $row = $stmt->fetch();
-        return $row ? $this->mapRowToUser($row) : null;
+    // Find user by email (search both folders)
+    public function findByEmail(string $email): ?array {
+        foreach ([$this->approvedDir, $this->pendingDir] as $folder) {
+            foreach (glob($folder . '*.json') as $file) {
+                $data = json_decode(file_get_contents($file), true);
+                if ($data && isset($data['email']) && $data['email'] === $email) {
+                    return $data;
+                }
+            }
+        }
+        return null;
     }
 
-    public function findByUsername(string $username): ?User {
-        $stmt = $this->pdo->prepare("SELECT * FROM users WHERE username = ? LIMIT 1");
-        $stmt->execute([$username]);
-        $row = $stmt->fetch();
-        return $row ? $this->mapRowToUser($row) : null;
+    // Login: returns user array if password OK, otherwise null
+    public function login(string $email, string $password): ?array {
+        $user = $this->findByEmail($email);
+
+        if (!$user || !isset($user['password'])) {
+            return null;
+        }
+
+        if (password_verify($password, $user['password'])) {
+            return $user; // Login successful
+        }
+
+        return null; // Wrong password
     }
 
-    public function findByToken(string $token): ?User {
-        $stmt = $this->pdo->prepare("SELECT * FROM users WHERE token = ? AND token_expires > NOW() LIMIT 1");
-        $stmt->execute([$token]);
-        $row = $stmt->fetch();
-        return $row ? $this->mapRowToUser($row) : null;
+    /* ============================================================
+       ================== CREATE / UPDATE / DELETE ================
+       ============================================================ */
+
+    // Create pending user (Signup)
+    public function create(array $userData): bool {
+
+        // Hash password before saving
+        if (isset($userData['password'])) {
+            $userData['password'] = password_hash($userData['password'], PASSWORD_BCRYPT);
+        }
+
+        $file = $this->pendingDir . $userData['username'] . '.json';
+
+        return file_put_contents($file, json_encode($userData, JSON_PRETTY_PRINT)) !== false;
     }
 
-    // === Create / Update / Delete ===
-    public function create(User $user): int {
-        $stmt = $this->pdo->prepare("
-            INSERT INTO users (username, firstName, lastName, email, phone, password_hash, role, status, creationDate)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
-        ");
-        $stmt->execute([
-            $user->getUsername(),
-            $user->getFirstName(),
-            $user->getLastName(),
-            $user->getEmail(),
-            $user->getPhone(),
-            $user->getPasswordHash(),
-            $user->getRole(),
-            $user->getRole() == 1 ? 'active' : 'pending'
-        ]);
-        return (int)$this->pdo->lastInsertId();
+    // Update user (can be in pending or approved)
+    public function update(string $username, array $userData, bool $approved = false): bool {
+
+        // If updating password, re-hash it
+        if (isset($userData['password']) && substr($userData['password'], 0, 4) !== '$2y$') {
+            $userData['password'] = password_hash($userData['password'], PASSWORD_BCRYPT);
+        }
+
+        $dir = $approved ? $this->approvedDir : $this->pendingDir;
+        $file = $dir . $username . '.json';
+
+        return file_put_contents($file, json_encode($userData, JSON_PRETTY_PRINT)) !== false;
     }
 
-    public function update(User $user): bool {
-        $stmt = $this->pdo->prepare("
-            UPDATE users SET username=?, firstName=?, lastName=?, email=?, phone=?, 
-                password_hash=?, role=?, status=?, token=?, token_expires=?,
-                totalScore1=?, totalScore2=?, totalScore3=?, dailyScore1=?, dailyScore2=?, dailyScore3=?,
-                streak=?, gamesPlayed1=?, gamesPlayed2=?, gamesPlayed3=?, wins=?, losses=?
-            WHERE uid=?
-        ");
-        return $stmt->execute([
-            $user->getUsername(),
-            $user->getFirstName(),
-            $user->getLastName(),
-            $user->getEmail(),
-            $user->getPhone(),
-            $user->getPasswordHash(),
-            $user->getRole(),
-            $user->getRole() == 1 ? 'active' : $user->getStatus(),
-            $user->getToken(),
-            $user->getTokenExpires(),
-            $user->getTotalScore1(),
-            $user->getTotalScore2(),
-            $user->getTotalScore3(),
-            $user->getDailyScore1(),
-            $user->getDailyScore2(),
-            $user->getDailyScore3(),
-            $user->getStreak(),
-            $user->getGamesPlayed1(),
-            $user->getGamesPlayed2(),
-            $user->getGamesPlayed3(),
-            $user->getWins(),
-            $user->getLosses(),
-            $user->getUid()
-        ]);
+    // Delete user
+    public function delete(string $username, bool $approved = false): bool {
+        $dir = $approved ? $this->approvedDir : $this->pendingDir;
+        $file = $dir . $username . '.json';
+
+        return file_exists($file) ? unlink($file) : false;
     }
 
-    public function delete(int $uid): bool {
-        $stmt = $this->pdo->prepare("DELETE FROM users WHERE uid = ?");
-        return $stmt->execute([$uid]);
+    /* ============================================================
+       ====================== APPROVAL =============================
+       ============================================================ */
+
+    // Approve user → move from pending to approved
+    public function approveUser(string $username): bool {
+        $pendingFile  = $this->pendingDir  . $username . '.json';
+        $approvedFile = $this->approvedDir . $username . '.json';
+
+        if (!file_exists($pendingFile)) {
+            return false;
+        }
+
+        return rename($pendingFile, $approvedFile);
     }
 
-    // === Lists & Counts ===
-    public function listAll(): array {
-        $stmt = $this->pdo->query("SELECT * FROM users ORDER BY creationDate DESC");
-        return array_map([$this, 'mapRowToUser'], $stmt->fetchAll());
-    }
+    /* ============================================================
+       =========================== LISTS ===========================
+       ============================================================ */
 
     public function listPending(): array {
-        $stmt = $this->pdo->query("SELECT * FROM users WHERE status='pending' ORDER BY creationDate DESC");
-        return array_map([$this, 'mapRowToUser'], $stmt->fetchAll());
+        return $this->listFromDir($this->pendingDir);
     }
 
-    public function countAll(): int {
-        return (int)$this->pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
+    public function listApproved(): array {
+        return $this->listFromDir($this->approvedDir);
     }
 
-    public function countPending(): int {
-        return (int)$this->pdo->query("SELECT COUNT(*) FROM users WHERE status='pending'")->fetchColumn();
-    }
+    private function listFromDir(string $dir): array {
+        $users = [];
 
-    public function getTopPlayers(int $limit = 10): array {
-        $stmt = $this->pdo->prepare("
-            SELECT * FROM users 
-            WHERE role = 0
-            ORDER BY (totalScore1 + totalScore2 + totalScore3) DESC 
-            LIMIT ?
-        ");
-        $stmt->execute([$limit]);
-        return array_map([$this, 'mapRowToUser'], $stmt->fetchAll());
-    }
+        foreach (glob($dir . '*.json') as $file) {
+            $data = json_decode(file_get_contents($file), true);
+            if ($data) {
+                $users[] = $data;
+            }
+        }
 
-    // === Helper: maps DB row to User object ===
-    private function mapRowToUser(array $row): User {
-        $user = new User(
-            $row['uid'] ?? null,
-            $row['username'] ?? null,
-            $row['firstName'] ?? null,
-            $row['lastName'] ?? null,
-            $row['email'] ?? null,
-            $row['password_hash'] ?? null,
-            $row['phone'] ?? null,
-            $row['role'] ?? 0,
-            $row['totalScore1'] ?? 0,
-            $row['totalScore2'] ?? 0,
-            $row['totalScore3'] ?? 0,
-            $row['dailyScore1'] ?? 0,
-            $row['dailyScore2'] ?? 0,
-            $row['dailyScore3'] ?? 0,
-            $row['streak'] ?? 0,
-            $row['gamesPlayed1'] ?? 0,
-            $row['gamesPlayed2'] ?? 0,
-            $row['gamesPlayed3'] ?? 0,
-            $row['wins'] ?? 0,
-            $row['losses'] ?? 0,
-            $row['creationDate'] ?? null
-        );
-
-        if (isset($row['status'])) $user->setStatus($row['status']);
-        if (isset($row['token'])) $user->setToken($row['token']);
-        if (isset($row['token_expires'])) $user->setTokenExpires($row['token_expires']);
-
-        return $user;
+        return $users;
     }
 }

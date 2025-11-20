@@ -19,7 +19,7 @@ function envoyerMail($to, $subject, $body, $fromName = 'Administrateur 2A10') {
     $headers = "MIME-Version: 1.0\r\n";
     $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
 
-    // === MODE SMTP (recommandé pour Gmail, etc.) ===
+   
     if (defined('MAILER') && MAILER === 'smtp' && class_exists('PHPMailer\PHPMailer\PHPMailer')) {
         $mail = new PHPMailer\PHPMailer\PHPMailer(true);
         try {

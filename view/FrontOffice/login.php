@@ -3,6 +3,12 @@ session_start();
 require_once __DIR__ . '/../../controller/config.php';
 require_once __DIR__ . '/../../model/user.php';
 require_once __DIR__ . '/../../controller/userC.php';
+
+// Check if user just signed up successfully
+$showSignupSuccess = isset($_SESSION['signup_success']) && $_SESSION['signup_success'] === true;
+if ($showSignupSuccess) {
+    unset($_SESSION['signup_success']); // Clear it after displaying
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -130,12 +136,12 @@ body {
     border-radius: 6px;
     width: 100%;
     outline: none;
-    margin-bottom: 2px; /* Reduced from 12px */
+    margin-bottom: 2px;
 }
 
 .input-group {
     width: 100%;
-    margin-bottom: 6px; /* Reduced from 12px */
+    margin-bottom: 6px;
 }
 
 .form-group label {
@@ -147,25 +153,37 @@ body {
 
 .error-message {
     color: #e74c3c;
-    font-size: 10px; /* Reduced from 12px */
-    margin: 0 0 4px 0; /* Reduced spacing */
+    font-size: 10px;
+    margin: 0 0 4px 0;
     line-height: 1.1;
     text-align: left;
     width: 100%;
-    min-height: 11px; /* Reduced from 14px */
+    min-height: 11px;
 }
 
 .success-message {
     color: #27ae60;
-    font-size: 13px;
-    margin: 4px 0 8px 0;
+    font-size: 12px;
+    margin: 8px 0;
     text-align: center;
-    font-weight: 500;
+    font-weight: 600;
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    padding: 12px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.success-message i {
+    font-size: 16px;
 }
 
 .sign-up h1 {
-    font-size: 24px; /* Reduced from 26px */
-    margin-bottom: 8px; /* Reduced from 12px */
+    font-size: 24px;
+    margin-bottom: 8px;
     text-align: center;
 }
 
@@ -176,8 +194,8 @@ body {
 }
 
 .sign-up span {
-    font-size: 11px; /* Reduced from 13px */
-    margin-bottom: 8px; /* Reduced from 12px */
+    font-size: 11px;
+    margin-bottom: 8px;
     text-align: center;
     display: block;
 }
@@ -190,9 +208,9 @@ body {
 
 .input-row {
     display: flex;
-    gap: 8px; /* Reduced from 10px */
+    gap: 8px;
     width: 100%;
-    margin-bottom: 2px; /* Reduced spacing */
+    margin-bottom: 2px;
 }
 
 .input-row input {
@@ -204,7 +222,7 @@ body {
 }
 
 .social-icons {
-    margin: 10px 0; /* Reduced from 15px */
+    margin: 10px 0;
     display: flex;
     justify-content: center;
 }
@@ -216,12 +234,12 @@ body {
     justify-content: center;
     align-items: center;
     margin: 0 3px;
-    width: 35px; /* Reduced from 40px */
-    height: 35px; /* Reduced from 40px */
+    width: 35px;
+    height: 35px;
 }
 
 .social-icons a i {
-    font-size: 14px; /* Slightly smaller icons */
+    font-size: 14px;
 }
 
 .toggle-container {
@@ -288,15 +306,14 @@ body {
     transform: translateX(200%);
 }
 
-/* Specific adjustments for sign-up form */
 .sign-up .input-group input {
-    padding: 7px 10px; /* Slightly smaller padding */
-    font-size: 11px; /* Slightly smaller font */
+    padding: 7px 10px;
+    font-size: 11px;
 }
 
 .sign-up button {
-    margin-top: 6px; /* Reduced from 10px */
-    padding: 9px 40px; /* Slightly smaller button */
+    margin-top: 6px;
+    padding: 9px 40px;
 }
 
 @media (max-width: 768px) {
@@ -378,6 +395,13 @@ body {
             </div>
             <span>Utilisez votre email et mot de passe</span>
             
+            <?php if($showSignupSuccess): ?>
+                <div class="success-message">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Inscription réussie ! Votre demande a été envoyée à l'administrateur.</span>
+                </div>
+            <?php endif; ?>
+            
             <div class="input-group">
                 <input type="email" name="email" id="loginEmail" placeholder="Email" />
                 <p class="error-message" id="loginEmailError"></p>
@@ -411,13 +435,13 @@ body {
     <div class="toggle-container">
         <div class="toggle">
             <div class="toggle-panel toggle-left">
-                <h1>Bon retour !</h1>
-                <p>Connectez-vous pour accéder à tous vos jeux et statistiques</p>
+                <h1>Bienvenue !</h1>
+                <p>Inscrivez-vous pour commencer votre aventure de jeu</p>
                 <button class="hidden" id="login">Se Connecter</button>
             </div>
             <div class="toggle-panel toggle-right">
                 <h1>Bienvenue !</h1>
-                <p>Inscrivez-vous pour commencer votre aventure de jeu</p>
+                <p>Connectez-vous pour accéder à tous vos jeux et statistiques</p>
                 <button class="hidden" id="register">S'inscrire</button>
             </div>
         </div>
